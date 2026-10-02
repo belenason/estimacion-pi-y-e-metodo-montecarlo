@@ -70,6 +70,23 @@ def potencia(n):
     return f"$10^{{{round(math.log10(n))}}}$"
 
 
+def eje_de_procesos(eje, procesos):
+    """Marca en el eje horizontal los valores de P medidos.
+
+    Con pocos procesos se usa escala lineal. Si el barrido llega a muchos procesos
+    (más de 32) se usa escala logarítmica, porque en escala lineal los puntos
+    1, 2, 4 y 8 quedarían amontonados. Devuelve True si usó escala logarítmica.
+    """
+    logaritmico = max(procesos) > 32
+    if logaritmico:
+        eje.set_xscale("log", base=2)
+    eje.set_xticks(procesos)
+    eje.set_xticklabels([str(p) for p in procesos])
+    eje.minorticks_off()
+    eje.set_xlabel("P (procesos)")
+    return logaritmico
+
+
 def grafico_intuicion():
     """Los dos experimentos, con pocas muestras para que se vean."""
     rng = np.random.default_rng(1)
@@ -157,10 +174,15 @@ def grafico_por_procesos(resumen, sistema, columna, etiqueta, archivo):
         for n, color in zip(tamanios, AZULES[-len(tamanios):]):
             linea = r[(r["constante"] == constante) & (r["N"] == n)]
             eje.plot(linea["P"], linea[columna], "o-", color=color, label=f"N = {potencia(n)}")
+        logaritmico = eje_de_procesos(eje, procesos)
         if columna == "t_mediana":
             eje.set_yscale("log")
-        eje.set_xticks(procesos)
-        eje.set_xlabel("P (procesos)")
+        elif logaritmico:
+            # Speedup en escala log-log: el ideal S = P sigue siendo una recta.
+            eje.set_yscale("log", base=2)
+            eje.set_yticks(procesos)
+            eje.set_yticklabels([str(p) for p in procesos])
+            eje.minorticks_off()
         eje.set_title(f"{NOMBRE[constante]} — sistema: {sistema}")
     ejes[0].set_ylabel(etiqueta)
     ejes[1].legend(loc="center left", bbox_to_anchor=(1, 0.5))
@@ -181,7 +203,7 @@ def grafico_eficiencia(resumen):
                             & (resumen["N"] == n)]
             eje.plot(linea["P"], linea["eficiencia"], "o-", color=color, label=sistema)
         eje.set_ylim(0, 1.3)
-        eje.set_xlabel("P (procesos)")
+        eje_de_procesos(eje, sorted(resumen["P"].unique()))
         eje.set_title(f"Eficiencia — {NOMBRE[constante]} con N = {potencia(n)}")
     ejes[0].set_ylabel("Eficiencia = speedup / P")
     ejes[1].legend(loc="center left", bbox_to_anchor=(1, 0.5))
