@@ -67,6 +67,7 @@ La única comunicación es un envío al principio y una suma al final, sin impor
 | `montecarlo_mpi.c` | Versión paralela con MPI |
 | `Makefile` | Compilación |
 | `benchmark.sh` | Corre todas las pruebas y guarda los tiempos en un CSV |
+| `verificar_sistema.sh` | Comprueba que estén las herramientas y cuántos núcleos hay disponibles |
 | `graficos.py` | Calcula mediana, speedup, eficiencia y error, y genera los gráficos |
 | `resultados/` | Tiempos medidos, tabla resumen y gráficos |
 
@@ -88,8 +89,8 @@ Cada programa imprime una línea: `constante,N,P,semilla,estimacion,error_abs,ti
 ## Pruebas
 
 ```bash
-./benchmark.sh pc           # en la PC
-./benchmark.sh servidor     # en el servidor
+./benchmark.sh pc                # en la PC
+./benchmark.sh cluster_boogie    # en el servidor (ver opciones más abajo)
 python graficos.py          # tabla resumen y gráficos, con todos los sistemas medidos
 ```
 
@@ -97,7 +98,7 @@ Por defecto se prueba N = 10⁵, 10⁶, 10⁷, 10⁸ y 10⁹ con P = 1, 2, 4 y 8
 cada una, para π y para e. Se puede cambiar con variables de entorno:
 
 ```bash
-PROCESOS="1 2 4 8 16 32" ./benchmark.sh servidor
+PROCESOS="1 2 4 8 12 16 24" OPCIONES_MPI="--bind-to none --oversubscribe" ./benchmark.sh cluster_boogie
 ```
 
 Métricas:
