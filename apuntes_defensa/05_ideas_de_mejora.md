@@ -14,7 +14,7 @@ que habría que explicar.
 | 4 | Referencia con NumPy | Un script de ~20 líneas y una barra en un gráfico | No | Bajo | Recomendable |
 | 5 | Escalado débil (ley de Gustafson) | Una opción en `benchmark.sh` y un gráfico | No | Bajo a medio | Recomendable si hay tiempo |
 | 6 | Validar argumentos con `strtoll` | Unas 8 líneas en `montecarlo.h` | Sí | Bajo | Opcional |
-| 7 | Experimento hasta 96 procesos | Nada: ya está preparado | No | Medio | Opcional (apunte 04, sección 5) |
+| 7 | Experimento hasta 96 procesos | Nada: ya está preparado | No | Medio | Opcional (apunte 04, sección 1.3) |
 | 8 | Programa serial "ingenuo" (`rand()` + `sqrt`) | Un archivo `.c` y un gráfico | Sí | Medio | Solo si sobra tiempo |
 | 9 | xoshiro256\*\* con `jump()` | Unas 60 líneas con operaciones de bits | Sí | Alto | Dejar como mejora futura |
 | 10 | Referencia "muy eficiente" (Intel MKL o SIMD) | Instalar una librería y código C contra su API | Sí | Alto | No recomendada |
@@ -89,7 +89,7 @@ escalado débil medí si puedo resolver un problema P veces más grande en el mi
 
 ## 7. Experimento hasta 96 procesos
 
-Ya está preparado; no requiere cambios. Comandos, lectura de la curva y qué decir: apunte 04, sección 5.
+Ya está preparado; no requiere cambios. Comandos, lectura de la curva y qué decir: apunte 04, sección 1.3.
 
 ## 8. Programa serial "ingenuo"
 

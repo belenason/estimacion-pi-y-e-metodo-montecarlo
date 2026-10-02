@@ -1,6 +1,6 @@
 # 01 — Introducción y planteo (guion de apertura del examen)
 
-> **Apunte de estudio.** Guía para preparar la defensa oral.
+> **Apunte de estudio.** Guía para preparar la defensa oral. Describe la rama `version-simple`.
 > Orden sugerido de estudio: este archivo → `02_codigo_linea_por_linea.md` → `03_graficos_speedup_y_conclusiones.md`.
 
 Cada tema tiene dos capas:
@@ -14,7 +14,7 @@ Contenido:
 2. Qué es el problema
 3. Ejemplos a mano, paso a paso
 4. Por qué lo encaré de esta forma
-5. Limitaciones, y cómo cada una empujó una versión del código
+5. Limitaciones, y cómo cada una influyó en la implementación
 6. Fundamento matemático completo (demostraciones)
 7. Preguntas probables y respuestas
 
@@ -39,12 +39,13 @@ Para decir casi textual al empezar. Tres bloques: qué, por qué así, limitacio
 >
 > **Limitaciones.** "El método converge lento: el error baja como uno sobre raíz de N, así que un
 > decimal más cuesta cien veces más muestras. Por eso necesito N muy grandes, y eso trae tres
-> problemas prácticos que guiaron el desarrollo: el desborde de enteros de 32 bits, el costo de
-> cada muestra y la calidad del generador de números aleatorios. Avancé en versiones: la V0 es la
-> traducción ingenua; la V1 quita operaciones caras y usa contadores de 64 bits; la V2 cambia
-> `rand()` por un generador moderno, xoshiro256\*\*, que además permite dar a cada proceso una
-> secuencia propia garantizada; y sobre la V2 construí la versión MPI. Medí tiempo, speedup y
-> eficiencia con la mediana de siete ejecuciones, en mi PC y en el clúster."
+> cuidados que guiaron la implementación: contadores de 64 bits, porque con N de mil millones un
+> entero común se desborda; un generador de números aleatorios de 48 bits, `drand48`, en lugar de
+> `rand()`; y una semilla distinta en cada proceso, porque si todos generaran los mismos números
+> tendría menos muestras reales de las que creo. Escribí una versión serial, que es la referencia,
+> y una versión MPI que comparte con ella exactamente el mismo código de cómputo. Medí tiempo,
+> speedup y eficiencia con la mediana de cinco ejecuciones, variando N y la cantidad de procesos,
+> en mi PC y en el clúster, y verifiqué que el error medido sigue la ley teórica."
 
 Una frase sobre un error común de vocabulario: las constantes son **deterministas** (valores
 fijos); lo que es **estocástico** (aleatorio) es el *método de estimación*. No decir "estimar de
@@ -111,15 +112,15 @@ En el código, "N" (el argumento del programa) es la cantidad de **puntos** para
 π ≈ 4 × 3 / 5 = **2,4**. Muy lejos de 3,14: con 5 puntos el error esperado es enorme
 (1,64/√5 ≈ 0,73). Con un millón de puntos el error típico baja a 0,0016.
 
-En el código esto es exactamente: `hits += (x * x + y * y <= 1.0);` dentro de un `for` de N vueltas,
-y al final `4.0 * hits / N`.
+En el código esto es exactamente `if (x * x + y * y <= 1.0) aciertos++;` dentro de un `for` de
+N vueltas (función `contar_aciertos_pi` de `montecarlo.h`), y al final `4.0 * aciertos / N`.
 
 ### 3.2 e con 4 ensayos
 
-Hay dos contadores: `sum` (la suma parcial, que vuelve a 0 en cada ensayo) y `total_draws` (cuántos
+Hay dos contadores: `suma` (la suma parcial, que vuelve a 0 en cada ensayo) y `sumandos` (cuántos
 números se generaron en total, que nunca se reinicia).
 
-| Ensayo | Números que salen | Suma parcial paso a paso | Números usados | `total_draws` |
+| Ensayo | Números que salen | Suma parcial paso a paso | Números usados | `sumandos` |
 |---|---|---|---|---|
 | 1 | 0,4 · 0,7 | 0,4 → 1,1 (pasó de 1, paro) | 2 | 2 |
 | 2 | 0,2 · 0,3 · 0,6 | 0,2 → 0,5 → 1,1 (paro) | 3 | 5 |
@@ -128,17 +129,17 @@ números se generaron en total, que nunca se reinicia).
 
 e ≈ 11 / 4 = **2,75**. El valor real es 2,718.
 
-En el código:
+En el código (función `contar_sumandos_e` de `montecarlo.h`):
 
 ```c
-for (uint64_t i = 0; i < n; i++) {     // un ensayo por vuelta
-    double sum = 0.0;                  // la suma arranca en 0 en cada ensayo
-    while (sum <= 1.0) {               // mientras no pase de 1...
-        sum += prng_uniform(g);        // ...sumo otro número al azar
-        total_draws++;                 // ...y cuento que generé uno más
+for (long long i = 0; i < n; i++) {    // un ensayo por vuelta
+    double suma = 0.0;                 // la suma arranca en 0 en cada ensayo
+    while (suma <= 1.0) {              // mientras no pase de 1...
+        suma += drand48();             // ...sumo otro número al azar
+        sumandos++;                    // ...y cuento que generé uno más
     }
 }
-// e ≈ total_draws / n
+// e ≈ sumandos / n
 ```
 
 Detalle para no confundirse: un ensayo **nunca** termina con un solo número, porque un número
@@ -176,7 +177,8 @@ cómputo por proceso.
 
 La **única condición** es que cada proceso use números aleatorios distintos e independientes de
 los demás. Si dos encuestadores entrevistan a las mismas personas, tengo menos información de la
-que creo. Eso se resuelve en la V2 con `jump()` (ver el apunte 02).
+que creo. En esta versión se resuelve dándole a cada proceso una semilla distinta; cómo funciona y
+cuál es su limitación está en el apunte 02, sección 5.2, paso 3.
 
 ### 4.3 Por qué el cuarto de círculo
 
@@ -196,26 +198,25 @@ que creo. Eso se resuelve en la V2 con `jump()` (ver el apunte 02).
 
 ---
 
-## 5. Limitaciones, y cómo cada una empujó una versión
+## 5. Limitaciones, y cómo cada una influyó en la implementación
 
-| Limitación | Consecuencia práctica | Dónde se atiende |
+| Limitación | Consecuencia práctica | Qué se hizo |
 |---|---|---|
-| Convergencia lenta, O(1/√N) | Hacen falta N de 10⁸ a 10¹⁰ para pocos decimales | Motiva todo: optimizar el costo por muestra y paralelizar |
-| Desborde de enteros | `int` llega a 2 147 483 647 (≈ 2,1 × 10⁹). Con N = 10¹⁰ el contador da la vuelta y el resultado es basura | **V1:** contadores `uint64_t` |
-| Operaciones caras por muestra | `sqrt`, `pow` y una división en cada iteración | **V1:** comparar x² + y² con 1, multiplicar por el inverso |
-| Calidad y período de `rand()` | Estado global oculto, 31 bits por llamada, período del orden de 2³⁵, sin forma de crear secuencias independientes | **V2:** xoshiro256\*\* |
-| Independencia entre procesos | Con `rand()` solo se puede usar `semilla + rango`, sin garantía | **MPI V2:** `jump()` da a cada proceso un tramo propio de 2¹²⁸ números |
-| Tiempo total | Un solo núcleo no alcanza para N grandes | **MPI:** reparto entre P procesos |
-
-**La progresión en una línea cada una:**
-
-- **V0 (ingenua):** la definición matemática tal cual: `rand()`, `sqrt(pow(x,2) + pow(y,2))`, `if`, `int`. Sirve de línea de base y rechaza N que desbordarían.
-- **V1 (matemática, saltos y tipos):** mismos números aleatorios, menos trabajo por muestra y contadores de 64 bits.
-- **V2 (generador):** mismo núcleo que V1, con xoshiro256\*\* en lugar de `rand()`.
-- **MPI V0 y MPI V2:** la versión ingenua y la final, repartidas entre procesos. Comparar las dos muestra que paralelizar no arregla un núcleo lento ni un generador malo.
+| Convergencia lenta, O(1/√N) | Hacen falta N de 10⁸ a 10⁹ (o más) para pocos decimales | Motiva todo: un núcleo de cómputo barato y la paralelización |
+| Desborde de enteros | `int` llega a 2 147 483 647 (≈ 2,1 × 10⁹). Con N = 10⁹ el contador de e ya llega a 2,7 × 10⁹ y daría la vuelta | Contadores `long long` (hasta ≈ 9,2 × 10¹⁸) |
+| Operaciones caras por muestra | Una raíz cuadrada por punto si se compara la distancia | Se compara x² + y² con 1, que es equivalente |
+| Calidad y portabilidad de `rand()` | El estándar solo garantiza 15 bits; algoritmo y calidad dependen del sistema | `drand48`: 48 bits, período 2⁴⁸ ≈ 2,8 × 10¹⁴, mismo algoritmo en todo sistema POSIX |
+| Independencia entre procesos | Con la misma semilla todos generarían los mismos números | Semilla distinta por proceso (`semilla + rank`). Sin garantía matemática de que los tramos no se solapen; se respalda midiendo que el error sigue la teoría |
+| Tiempo total | Un solo núcleo no alcanza para N grandes | MPI: reparto de las N muestras entre P procesos |
+| Costo fijo de arrancar MPI | Con N chico, lanzar los procesos cuesta más que el cálculo | No se puede evitar: se documenta a partir de qué N conviene paralelizar |
 
 **Paralelizar no cambia la ley de convergencia.** Con P procesos hago P veces más muestras en el
 mismo tiempo, pero el error solo baja √P veces. Paralelizar compra tiempo, no una convergencia mejor.
+
+**Lo que quedó como mejora futura**, y por qué (detalle en el apunte 05): un generador con
+secuencias independientes garantizadas por proceso (xoshiro256\*\* con función de salto), que
+resolvería el punto débil de `semilla + rank` a cambio de bastante más código; y validar los
+argumentos con `strtoll` en lugar de `atoll`.
 
 ---
 
@@ -253,7 +254,7 @@ $$E[N] = \sum_{n=0}^{\infty}\frac{1}{n!} = e$$
 
 que es la serie de Taylor de eˣ en x = 1.
 
-**Distribución del conteo** (es lo que muestra el histograma `intuicion_e`):
+**Distribución del conteo** (es lo que muestra el panel derecho de `intuicion.png`):
 
 $$P(N = n) = \frac{1}{(n-1)!} - \frac{1}{n!} = \frac{n-1}{n!}, \quad n \ge 2$$
 

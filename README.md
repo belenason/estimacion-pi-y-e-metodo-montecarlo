@@ -136,17 +136,18 @@ Los tiempos medidos (`tiempos_<sistema>.csv`), la tabla con medianas, speedup y 
 
 En `apuntes_defensa/` hay apuntes para preparar la defensa oral, y en `docs/` un borrador del informe:
 
-| Archivo | Contenido | Se refiere a |
-|---|---|---|
-| [01_introduccion_y_planteo.md](apuntes_defensa/01_introduccion_y_planteo.md) | Guion de apertura, los dos experimentos, ejemplos a mano y demostraciones | Las dos ramas |
-| [02_codigo_linea_por_linea.md](apuntes_defensa/02_codigo_linea_por_linea.md) | El código explicado bloque por bloque; conceptos de C y funciones de MPI | Rama `main` |
-| [03_graficos_speedup_y_conclusiones.md](apuntes_defensa/03_graficos_speedup_y_conclusiones.md) | Cómo leer cada gráfico, resultados medidos, conclusiones y mejoras futuras | Rama `main` |
-| [04_version_simple.md](apuntes_defensa/04_version_simple.md) | Diferencias entre las dos ramas, justificación de cada decisión y cómo correr las pruebas | Rama `version-simple` |
-| [05_ideas_de_mejora.md](apuntes_defensa/05_ideas_de_mejora.md) | Mejoras candidatas para la versión simple, ordenadas por conveniencia | Rama `version-simple` |
-| [ANALYSIS_AND_CONCLUSIONS.md](docs/ANALYSIS_AND_CONCLUSIONS.md) | Borrador del informe: metodología, tablas y conclusiones | Rama `main` |
+| Archivo | Contenido |
+|---|---|
+| [01_introduccion_y_planteo.md](apuntes_defensa/01_introduccion_y_planteo.md) | Guion de apertura, los dos experimentos, ejemplos a mano, demostraciones y limitaciones |
+| [02_codigo_linea_por_linea.md](apuntes_defensa/02_codigo_linea_por_linea.md) | Cada archivo explicado bloque por bloque, con la justificación de cada decisión |
+| [03_graficos_speedup_y_conclusiones.md](apuntes_defensa/03_graficos_speedup_y_conclusiones.md) | Cómo leer cada gráfico, por qué tiene esa forma, conclusiones y mejoras futuras |
+| [04_version_simple.md](apuntes_defensa/04_version_simple.md) | Cómo correr las pruebas en la PC y en el clúster, la consigna punto por punto y la relación con la rama `main` |
+| [05_ideas_de_mejora.md](apuntes_defensa/05_ideas_de_mejora.md) | Mejoras candidatas, ordenadas por conveniencia |
+| [ANALYSIS_AND_CONCLUSIONS.md](docs/ANALYSIS_AND_CONCLUSIONS.md) | Borrador de informe de la rama `main` (los números y la implementación no corresponden a esta versión) |
 
-El repositorio tiene dos ramas: `main` (versión completa, con tres versiones seriales y generador
-xoshiro256\*\*) y `version-simple` (versión reducida, con un programa serial y uno MPI).
+Los apuntes de esta rama describen el código de esta rama. El repositorio tiene además la rama
+`main`, una versión más extensa (tres versiones seriales y generador xoshiro256\*\*) con sus
+propios apuntes.
 
 ## Bibliografía
 
