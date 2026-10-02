@@ -108,6 +108,26 @@ def fitted_slopes(errors):
     return pd.DataFrame(rows)
 
 
+def consistency_warnings(speedup):
+    """Avisos sobre mediciones sospechosas, para revisarlas antes de sacar conclusiones.
+
+    - Con P = 1 la versión MPI ejecuta el mismo núcleo que la serial: el speedup debería ser
+      cercano a 1. Si no lo es, la máquina cambió de velocidad entre un bloque y otro.
+    - Si entre la repetición más rápida y la más lenta hay más de un 50 % de diferencia,
+      algo perturbó esa configuración (otra carga en la máquina, cambio de frecuencia).
+    Solo se miran ejecuciones de más de 0,1 s: en las más cortas el ruido es esperable.
+    """
+    warnings = []
+    long_runs = speedup[speedup["t_median"] > 0.1]
+    for _, row in long_runs.iterrows():
+        label = f"{row['system']} {row['program']} {row['constant']} N={row['N']:.0e} P={row['P']}"
+        if row["P"] == 1 and not 0.85 <= row["speedup"] <= 1.15:
+            warnings.append(f"{label}: speedup {row['speedup']:.2f} con un solo proceso")
+        if row["t_max"] > 1.5 * row["t_min"]:
+            warnings.append(f"{label}: tiempos entre {row['t_min']:.2f} s y {row['t_max']:.2f} s")
+    return warnings
+
+
 def to_markdown(table, formats=None):
     """Convierte una tabla en texto Markdown. 'formats' indica cómo escribir cada columna."""
     formats = formats or {}
@@ -188,6 +208,11 @@ def main():
     print(f"Ejecuciones leídas: {len(raw)}  |  sistemas: {', '.join(sorted(raw['system'].unique()))}")
     print(f"Tablas escritas en {SUMMARY_DIR}")
     print(slopes.to_string(index=False))
+
+    warnings = consistency_warnings(speedup)
+    print(f"Avisos de coherencia: {len(warnings)}")
+    for warning in warnings:
+        print("  -", warning)
 
 
 if __name__ == "__main__":

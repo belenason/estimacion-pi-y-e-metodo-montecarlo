@@ -92,15 +92,20 @@ QUICK=1 bash scripts/run_benchmark.sh           # prueba corta → results/quick
 ```
 
 El barrido se configura con variables de entorno (`NS`, `PS`, `REPS`, `MAX_N`, `MPIRUN`,
-`MPIRUN_FLAGS`, …), documentadas en el encabezado del script. Ejemplo para un clúster:
+`MPIRUN_FLAGS`, …), documentadas en el encabezado del script. En el clúster (contenedor con 24
+núcleos asignados y `mpirun` directo):
 
 ```bash
-SYSTEM=cluster PS="1 2 4 8 16 32" MAX_N=10000000000 \
-NS="100000 1000000 10000000 100000000 1000000000 10000000000" \
-MPIRUN_FLAGS="--bind-to core" bash scripts/run_benchmark.sh
+MPIRUN_FLAGS="--bind-to none --oversubscribe" bash scripts/check_system.sh 24   # comprobación previa
+SYSTEM=cluster_boogie bash scripts/collect_sysinfo.sh
+
+SYSTEM=cluster_boogie PS="1 2 4 8 12 16 24" \
+MPIRUN_FLAGS="--bind-to none --oversubscribe" HWTHREAD_FLAGS="" \
+bash scripts/run_benchmark.sh
 ```
 
-Para clústeres con SLURM hay una plantilla en `scripts/slurm_job.sh`.
+`--bind-to none` evita que Open MPI intente fijar cada proceso a un núcleo, algo que dentro de un
+contenedor puede fallar. El encabezado de `run_benchmark.sh` incluye una segunda pasada opcional con N = 10¹⁰.
 
 Cada configuración se ejecuta 7 veces. La última columna del CSV (`wall_s`) es el tiempo total del
 lanzamiento, incluido el arranque de MPI, que queda fuera del tiempo cronometrado por el programa.

@@ -3,6 +3,11 @@
 # (procesador, memoria, compilador, MPI) en results/sysinfo/<SYSTEM>.txt.
 #
 # Uso:   SYSTEM=pc bash scripts/collect_sysinfo.sh
+#
+# En un contenedor, lscpu describe la máquina completa y no lo que se asignó.
+# Por eso se guardan también nproc y el límite de CPU del contenedor, y se
+# puede indicar a mano la cantidad de núcleos físicos disponibles:
+#        SYSTEM=cluster_boogie PHYS_CORES=12 bash scripts/collect_sysinfo.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -21,8 +26,14 @@ mkdir -p results/sysinfo
     echo "=== Procesador (lscpu) ==="
     lscpu | grep -E '^(Architecture|CPU\(s\)|Model name|Thread\(s\) per core|Core\(s\) per socket|Socket\(s\)|NUMA node\(s\)|CPU max MHz|CPU MHz|L1d cache|L1i cache|L2 cache|L3 cache|Hypervisor vendor|Virtualization type)' || true
     echo
-    echo "Núcleos físicos: $(lscpu -p=CORE,SOCKET | grep -v '^#' | sort -u | wc -l)"
-    echo "CPU lógicas:     $(nproc)"
+    echo "Núcleos físicos: ${PHYS_CORES:-$(lscpu -p=CORE,SOCKET | grep -v '^#' | sort -u | wc -l)}"
+    echo "CPU lógicas disponibles (nproc): $(nproc)"
+    if [ -f /sys/fs/cgroup/cpu.max ]; then
+        echo "Límite de CPU del contenedor (cpu.max): $(cat /sys/fs/cgroup/cpu.max)"
+    fi
+    if [ -f /sys/fs/cgroup/cpuset.cpus.effective ]; then
+        echo "CPU asignadas al contenedor (cpuset): $(cat /sys/fs/cgroup/cpuset.cpus.effective)"
+    fi
     echo
     echo "=== Memoria ==="
     free -h | head -n 2

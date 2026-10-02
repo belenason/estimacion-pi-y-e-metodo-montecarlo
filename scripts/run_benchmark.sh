@@ -7,10 +7,22 @@
 # Prueba rápida de un par de minutos (no pisa los resultados reales):
 #     QUICK=1 bash scripts/run_benchmark.sh
 #
-# Ejemplo en el clúster:
-#     SYSTEM=cluster PS="1 2 4 8 16 32" MAX_N=10000000000 \
-#     NS="100000 1000000 10000000 100000000 1000000000 10000000000" \
-#     MPIRUN_FLAGS="--bind-to core" bash scripts/run_benchmark.sh
+# En el clúster (contenedor con 24 núcleos asignados, mpirun directo):
+#     SYSTEM=cluster_boogie PS="1 2 4 8 12 16 24" \
+#     MPIRUN_FLAGS="--bind-to none --oversubscribe" HWTHREAD_FLAGS="" \
+#     bash scripts/run_benchmark.sh
+#
+#   --bind-to none    dentro de un contenedor Open MPI no siempre puede fijar
+#                     cada proceso a un núcleo; se deja que el sistema los ubique
+#   --oversubscribe   Open MPI puede contar mal los núcleos disponibles en el contenedor
+#   HWTHREAD_FLAGS="" desactiva la opción de hilos lógicos, que es para la PC
+#
+# Segunda pasada opcional con N = 10^10, solo la versión final y 3 repeticiones,
+# agregando filas al mismo archivo:
+#     SYSTEM=cluster_boogie APPEND=1 NS=10000000000 MAX_N=10000000000 REPS=3 \
+#     SERIAL_PROGRAMS=serial_v2 MPI_PROGRAMS=mpi_v2 PS="1 2 4 8 12 16 24" \
+#     MPIRUN_FLAGS="--bind-to none --oversubscribe" HWTHREAD_FLAGS="" \
+#     bash scripts/run_benchmark.sh
 #
 # Variables de entorno (todas opcionales):
 #     SYSTEM          nombre del sistema; define el archivo de salida (por defecto: pc)
@@ -23,9 +35,11 @@
 #     MPIRUN          lanzador MPI (mpirun, srun, ...)
 #     MPIRUN_FLAGS    opciones extra para el lanzador, en todas las ejecuciones
 #     HWTHREAD_FLAGS  opciones que se agregan solo cuando P supera los núcleos físicos
+#                     (por defecto --use-hwthread-cpus; vacío para no agregar nada)
 #     PHYS_CORES      núcleos físicos (por defecto se detectan con lscpu)
 #     CONSTANTS, SERIAL_PROGRAMS, MPI_PROGRAMS   para repetir solo una parte del barrido
 #     OUT_DIR         carpeta de salida (por defecto results/raw)
+#     APPEND          con APPEND=1 agrega filas al archivo existente en lugar de empezar uno nuevo
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -39,7 +53,7 @@ V01_MAX_N=${V01_MAX_N:-1000000000}
 MPI_V0_MAX_N=${MPI_V0_MAX_N:-100000000}
 MPIRUN=${MPIRUN:-mpirun}
 MPIRUN_FLAGS=${MPIRUN_FLAGS:-}
-HWTHREAD_FLAGS=${HWTHREAD_FLAGS:---use-hwthread-cpus}
+HWTHREAD_FLAGS=${HWTHREAD_FLAGS---use-hwthread-cpus}
 PHYS_CORES=${PHYS_CORES:-$(lscpu -p=CORE,SOCKET | grep -v '^#' | sort -u | wc -l)}
 OUT_DIR=${OUT_DIR:-results/raw}
 CONSTANTS=${CONSTANTS:-"pi e"}
@@ -80,12 +94,14 @@ limit_for() {
 # Ejecuta un programa una vez y agrega su fila al CSV, con el tiempo total de
 # lanzamiento (wall_s) como última columna. P = 0 indica ejecución serial.
 #
-# La semilla es 100 * P + repetición: cada combinación de P y repetición usa
-# una semilla distinta, así las estimaciones son muestras independientes y
-# sirven también para estudiar el error.
+# La semilla es 100000 * repetición + 1000 * P: cada combinación de P y
+# repetición usa una semilla distinta, así las estimaciones son muestras
+# independientes y sirven también para estudiar el error. Se dejan huecos de
+# 1000 porque mpi_v0 siembra cada proceso con "semilla + rango": sin huecos,
+# un proceso de una ejecución repetiría la semilla de otro de la siguiente.
 run_one() {
     local p=$1 program=$2 constant=$3 n=$4 rep=$5
-    local seed=$((100 * p + rep))
+    local seed=$((100000 * rep + 1000 * p))
     local start end row wall flags
 
     start=$(date +%s.%N)
@@ -109,10 +125,14 @@ make
 
 mkdir -p "$OUT_DIR"
 OUT="$OUT_DIR/$SYSTEM.csv"
-if [ -f "$OUT" ]; then
-    mv "$OUT" "$OUT.$(date +%Y%m%d-%H%M%S).bak"   # no mezclar con una corrida anterior
+if [ "${APPEND:-0}" = "1" ] && [ -f "$OUT" ]; then
+    echo "Agregando filas a $OUT" >&2
+else
+    if [ -f "$OUT" ]; then
+        mv "$OUT" "$OUT.$(date +%Y%m%d-%H%M%S).bak"   # no mezclar con una corrida anterior
+    fi
+    echo "system,program,constant,N,P,seed,estimate,abs_err,rel_err,time_s,wall_s" > "$OUT"
 fi
-echo "system,program,constant,N,P,seed,estimate,abs_err,rel_err,time_s,wall_s" > "$OUT"
 
 echo "Sistema: $SYSTEM | núcleos físicos: $PHYS_CORES | repeticiones: $REPS" >&2
 echo "N: $NS" >&2
