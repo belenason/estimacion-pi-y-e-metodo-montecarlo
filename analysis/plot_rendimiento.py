@@ -21,12 +21,22 @@ from common import (AQUA, AXIS, BLUE, INK_SECONDARY, MUTED, ORANGE, SEQUENTIAL_B
 CONSTANTS = ["pi", "e"]
 
 
+def wide_sweep(p_values):
+    """True si el barrido llega a muchos procesos (más de 32).
+
+    En ese caso los gráficos usan escala logarítmica en P: en escala lineal los puntos
+    1, 2, 4 y 8 quedarían amontonados. En log-log el speedup ideal S = P sigue siendo una recta.
+    """
+    return max(p_values) > 32
+
+
 def set_p_axis(ax, p_values, log=False):
     """Eje horizontal para P, con una marca por cada valor medido.
 
-    Lineal por defecto (así el speedup ideal S = P es una recta); logarítmico para los tiempos.
+    Lineal por defecto (así el speedup ideal S = P es una recta); logarítmico para los
+    tiempos y para los barridos con muchos procesos.
     """
-    if log:
+    if log or wide_sweep(p_values):
         ax.set_xscale("log", base=2)
     ax.set_xticks(p_values)
     ax.set_xticklabels([str(p) for p in p_values])
@@ -43,9 +53,22 @@ def mark_physical_cores(ax, system, p_values):
                 fontsize=8.5, color=INK_SECONDARY, ha="left", va="bottom")
 
 
+def set_speedup_axis(ax, p_values):
+    """Eje vertical del speedup: desde 0 en escala lineal, o logarítmico si el barrido es amplio."""
+    if wide_sweep(p_values):
+        ax.set_yscale("log", base=2)
+        ax.set_yticks(p_values)
+        ax.set_yticklabels([str(p) for p in p_values])
+        ax.minorticks_off()
+    else:
+        ax.set_ylim(bottom=0)
+
+
 def plot_serial_versions(gains, system):
     """Barras: nanosegundos por muestra de cada versión serial, en el mayor N medido para las tres."""
     data = gains[gains["system"] == system].dropna(subset=["t_v0", "t_v1", "t_v2"])
+    if data.empty:
+        return      # en este sistema no se midieron las tres versiones seriales
     fig, ax = plt.subplots(figsize=(6.8, 4.4))
     width = 0.25
     notes = []
@@ -112,7 +135,7 @@ def plot_speedup(speedup, system):
         ax.plot(p_values, p_values, color=MUTED, linestyle="--", linewidth=1.5, label="Ideal: S = P")
         lines_by_n(ax, data[data["constant"] == constant], "speedup", p_values)
         ax.set_title(f"Speedup de mpi_v2 — {SYMBOL[constant]}")
-        ax.set_ylim(bottom=0)
+        set_speedup_axis(ax, p_values)
         mark_physical_cores(ax, system, p_values)
     axes[0].set_ylabel("Speedup  S = T serial / T con P procesos")
     axes[1].legend(loc="center left", bbox_to_anchor=(1.0, 0.5))
@@ -125,6 +148,8 @@ def plot_speedup(speedup, system):
 def plot_speedup_v0_v2(speedup, system, serial_fraction=0.05):
     """Compara el escalado de la versión ingenua y de la final, en el mayor N medido para ambas."""
     data = speedup[speedup["system"] == system]
+    if "mpi_v0" not in set(data["program"]):
+        return      # en este sistema no se midió la versión ingenua
     p_values = sorted(data["P"].unique())
     p_line = np.linspace(min(p_values), max(p_values), 100)
     fig, axes = plt.subplots(1, 2, figsize=(10.5, 4.3), sharey=True)
@@ -143,7 +168,7 @@ def plot_speedup_v0_v2(speedup, system, serial_fraction=0.05):
             line = rows[(rows["program"] == program) & (rows["N"] == n)].sort_values("P")
             ax.plot(line["P"], line["speedup"], marker="o", color=color, label=program)
         set_p_axis(ax, p_values)
-        ax.set_ylim(bottom=0)
+        set_speedup_axis(ax, p_values)
         ax.set_title(f"{SYMBOL[constant]} con N = {power_label(n)}")
         mark_physical_cores(ax, system, p_values)
     axes[0].set_ylabel("Speedup")

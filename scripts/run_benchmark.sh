@@ -24,6 +24,12 @@
 #     MPIRUN_FLAGS="--bind-to none --oversubscribe" HWTHREAD_FLAGS="" \
 #     bash scripts/run_benchmark.sh
 #
+# Experimento adicional hasta 96 procesos (perfil de 96 núcleos), en un archivo aparte:
+#     SYSTEM=cluster_boogie_96 NS="1000000000 10000000000" MAX_N=10000000000 REPS=3 \
+#     SERIAL_PROGRAMS=serial_v2 MPI_PROGRAMS=mpi_v2 PS="1 2 4 8 16 24 32 48 64 96" \
+#     MPIRUN_FLAGS="--bind-to none --oversubscribe" HWTHREAD_FLAGS="" \
+#     bash scripts/run_benchmark.sh
+#
 # Variables de entorno (todas opcionales):
 #     SYSTEM          nombre del sistema; define el archivo de salida (por defecto: pc)
 #     NS              lista de tamaños N
