@@ -22,3 +22,7 @@ ANALYSIS_AND_CONCLUSIONS.md
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Ejecutables de la version simple
+montecarlo_serial
+montecarlo_mpi

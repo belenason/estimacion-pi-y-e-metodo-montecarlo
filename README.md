@@ -1,149 +1,142 @@
-# Estimación de π y e por el método de Monte Carlo con MPI
+# Estimación de π y e con el método de Monte Carlo y MPI
 
-Proyecto 1 de la Evaluación Parcial 1 — Computación Científica.
+Proyecto 1 — Evaluación Parcial 1 — Computación Científica
 
-Se estiman las constantes π y e con el método de Monte Carlo, primero en serie (tres versiones, cada
-una con una optimización sobre la anterior) y luego en paralelo con MPI. Se mide tiempo, speedup y
-eficiencia usando la mediana de varias ejecuciones, en dos sistemas distintos.
+## El problema
 
-## Los dos experimentos
+El método de Monte Carlo resuelve un problema determinista usando muestreo aleatorio: se repite
+muchas veces un experimento al azar y de la frecuencia de los resultados se obtiene el valor
+buscado. En este proyecto se usa para estimar π y e, se estudia cómo baja el error al aumentar la
+cantidad de simulaciones, y se paraleliza con MPI para medir el speedup.
 
-- **π:** se generan puntos al azar en el cuadrado unitario. La fracción que cae dentro del cuarto
-  de círculo de radio 1 tiende a π/4, así que π ≈ 4 × aciertos / N.
-- **e:** se suman números uniformes en [0, 1] hasta que la suma supera 1. La cantidad promedio de
-  números necesarios tiende a e, así que e ≈ números generados / N.
+### Estimación de π
 
-En ambos casos el error decae como 1/√N.
+Se generan puntos (x, y) al azar en el cuadrado [0,1] × [0,1] y se cuenta cuántos caen dentro del
+cuarto de círculo de radio 1 (los que cumplen x² + y² ≤ 1). Como el área del cuarto de círculo es
+π/4 y la del cuadrado es 1, la proporción de puntos que cae dentro tiende a π/4:
 
-## Versiones
+    π ≈ 4 × aciertos / N
 
-| Programa | Qué cambia respecto de la anterior |
+### Estimación de e
+
+Se suman números al azar entre 0 y 1 hasta que la suma supera 1, y se anota cuántos números
+hicieron falta. El promedio de esa cantidad tiende a e:
+
+    e ≈ total de números generados / N        (N = cantidad de ensayos)
+
+Esto sale de que la probabilidad de que n números uniformes sumen como mucho 1 es 1/n!, entonces la
+probabilidad de necesitar más de n números es 1/n!, y la cantidad esperada es la suma de 1/n!, que es e.
+
+### Convergencia
+
+En los dos casos el error baja como 1/√N: para ganar un decimal más hay que usar 100 veces más
+muestras. Por eso hacen falta N muy grandes y tiene sentido paralelizar.
+
+## Cómo se paralelizó
+
+Cada muestra es independiente de las demás, así que el problema es "embarazosamente paralelo":
+
+1. El proceso 0 lee los argumentos y los envía a todos con `MPI_Bcast`.
+2. Las N muestras se reparten: cada proceso hace N / P, y si la división no es exacta los primeros
+   N % P procesos hacen una más. Así se hacen exactamente N muestras.
+3. Cada proceso inicializa el generador de números aleatorios con una semilla distinta
+   (semilla + número de proceso) y hace su parte sin comunicarse con los demás.
+4. Los contadores de todos los procesos se suman con una sola `MPI_Reduce`.
+5. El tiempo se mide con `MPI_Wtime()` después de una `MPI_Barrier()`, para que todos los procesos empiecen juntos.
+
+La única comunicación es un envío al principio y una suma al final, sin importar el valor de N.
+
+## Decisiones de implementación
+
+- **Generador de números aleatorios:** `drand48()` en lugar de `rand()`. Usa 48 bits (período
+  2⁴⁸ ≈ 2,8 × 10¹⁴) y devuelve directamente un real en [0, 1). `rand()` solo garantiza 15 bits
+  (`RAND_MAX` puede ser 32767) y su calidad depende de la plataforma.
+- **Contadores `long long`:** un `int` llega hasta unos 2,1 × 10⁹ y se desbordaría con los N más grandes.
+- **Sin raíz cuadrada:** se compara x² + y² con 1 directamente, que es equivalente a comparar la distancia.
+- **Se suman contadores enteros y no estimaciones:** la suma de enteros es exacta y no hay que
+  ponderar cuando los procesos hacen distinta cantidad de muestras.
+- **Mediana de varias ejecuciones:** cada configuración se corre 5 veces y se usa la mediana del
+  tiempo, que no se ve afectada si alguna ejecución sale lenta por otra tarea del sistema.
+
+## Archivos
+
+| Archivo | Contenido |
 |---|---|
-| `serial_v0` | Línea de base ingenua: `rand()`, `sqrt()`, `pow()`, `if`, contadores `int` |
-| `serial_v1` | Sin `sqrt` ni `pow`, multiplicación en lugar de división, sin `if`, contadores `uint64_t` |
-| `serial_v2` | Generador xoshiro256\*\* en lugar de `rand()` |
-| `mpi_v0` | `serial_v0` repartido entre P procesos (referencia ingenua, semilla + rango) |
-| `mpi_v2` | `serial_v2` repartido entre P procesos; cada proceso usa un tramo propio del generador (`jump`) |
+| `montecarlo.h` | Los dos experimentos, lectura de argumentos y salida |
+| `montecarlo_serial.c` | Versión serial (referencia para el speedup) |
+| `montecarlo_mpi.c` | Versión paralela con MPI |
+| `Makefile` | Compilación |
+| `benchmark.sh` | Corre todas las pruebas y guarda los tiempos en un CSV |
+| `graficos.py` | Calcula mediana, speedup, eficiencia y error, y genera los gráficos |
+| `resultados/` | Tiempos medidos, tabla resumen y gráficos |
 
-Diseño de las versiones MPI:
+## Cómo compilar y ejecutar
 
-- El proceso 0 lee los argumentos y los difunde con `MPI_Bcast`.
-- Reparto: `local_n = N / P + (rank < N % P ? 1 : 0)`. La suma es exactamente N y el desbalance máximo es de una muestra.
-- Cada proceso cuenta sin comunicarse; los contadores se suman con una sola `MPI_Reduce`.
-- El tiempo se mide con `MPI_Wtime()` después de una `MPI_Barrier()`, e incluye la reducción.
-
-## Estructura
-
-```
-Makefile                 compila todo con las mismas flags
-src/common/prng.h        generador xoshiro256** (semilla con splitmix64, función jump)
-src/common/util.h        lectura de argumentos, cronómetro y salida CSV
-src/serial/              serial_v0.c  serial_v1.c  serial_v2.c
-src/mpi/                 mpi_v0.c  mpi_v2.c
-scripts/                 instalación, benchmarks e información del sistema
-analysis/                cálculo de métricas y gráficos (Python)
-results/raw/             una fila CSV por ejecución, un archivo por sistema
-results/sysinfo/         descripción de cada sistema medido
-results/summary/         tablas con medianas, speedup, eficiencia y errores
-results/figures/         figuras en PNG y PDF
-```
-
-## Requisitos
-
-Linux (o Windows con WSL2), gcc, make, Open MPI y Python 3 con numpy, pandas y matplotlib.
+Requisitos: gcc, make, Open MPI, y Python 3 con numpy, pandas y matplotlib
+(`pip install -r requirements.txt`).
 
 ```bash
-bash scripts/setup_wsl.sh                       # instala gcc, make y Open MPI en Ubuntu
-python3 -m venv .venv && source .venv/bin/activate
-python -m pip install -r analysis/requirements.txt
+make
+
+./montecarlo_serial pi 100000000
+./montecarlo_serial e 100000000
+mpirun -np 4 ./montecarlo_mpi pi 100000000
 ```
 
-## Compilación
+Cada programa imprime una línea: `constante,N,P,semilla,estimacion,error_abs,tiempo_s`.
+
+## Pruebas
 
 ```bash
-make          # compila todo en bin/
-make info     # muestra compiladores y flags
-make clean
+./benchmark.sh pc           # en la PC
+./benchmark.sh servidor     # en el servidor
+python graficos.py          # tabla resumen y gráficos, con todos los sistemas medidos
 ```
 
-Flags, iguales para todas las versiones:
-`-std=c11 -O3 -march=native -Wall -Wextra -Wpedantic -D_POSIX_C_SOURCE=200809L`.
-Como `-march=native` genera código para el procesador donde se compila, hay que recompilar en cada sistema.
-
-## Uso
-
-Todos los programas reciben la constante, N y la semilla, e imprimen una línea CSV:
+Por defecto se prueba N = 10⁵, 10⁶, 10⁷, 10⁸ y 10⁹ con P = 1, 2, 4 y 8 procesos, 5 repeticiones de
+cada una, para π y para e. Se puede cambiar con variables de entorno:
 
 ```bash
-./bin/serial_v2 pi 100000000 1
-mpirun -np 4 ./bin/mpi_v2 e 100000000 1
-```
-
-```
-sistema,programa,constante,N,P,semilla,estimacion,error_abs,error_rel,tiempo_s
-```
-
-## Benchmarks
-
-```bash
-SYSTEM=pc bash scripts/collect_sysinfo.sh       # guarda la descripción del sistema
-SYSTEM=pc bash scripts/run_benchmark.sh         # barrido completo → results/raw/pc.csv
-QUICK=1 bash scripts/run_benchmark.sh           # prueba corta → results/quick/
-```
-
-El barrido se configura con variables de entorno (`NS`, `PS`, `REPS`, `MAX_N`, `MPIRUN`,
-`MPIRUN_FLAGS`, …), documentadas en el encabezado del script. Ejemplo para un clúster:
-
-```bash
-SYSTEM=cluster PS="1 2 4 8 16 32" MAX_N=10000000000 \
-NS="100000 1000000 10000000 100000000 1000000000 10000000000" \
-MPIRUN_FLAGS="--bind-to core" bash scripts/run_benchmark.sh
-```
-
-Para clústeres con SLURM hay una plantilla en `scripts/slurm_job.sh`.
-
-Cada configuración se ejecuta 7 veces. La última columna del CSV (`wall_s`) es el tiempo total del
-lanzamiento, incluido el arranque de MPI, que queda fuera del tiempo cronometrado por el programa.
-
-## Análisis y gráficos
-
-```bash
-python analysis/analyze.py            # → results/summary/*.csv y tablas.md
-python analysis/plot_intuicion.py     # → results/figures/
-python analysis/plot_convergencia.py
-python analysis/plot_rendimiento.py
+PROCESOS="1 2 4 8 16 32" ./benchmark.sh servidor
 ```
 
 Métricas:
 
-- Tiempo mediano: mediana de los tiempos de las repeticiones de cada configuración.
-- Speedup: S_p = T_serial,mediana / T_p,mediana, contra la versión serial equivalente.
-- Eficiencia: E_p = S_p / P.
-- Error absoluto: |estimación − valor real|. Error relativo: error absoluto / valor real.
+- Speedup: S = T serial (mediana) / T con P procesos (mediana)
+- Eficiencia: E = S / P
+- Error: |estimación − valor real|
 
-Figuras generadas:
+## Resultados
 
-| Figura | Qué muestra |
+Los tiempos medidos (`tiempos_<sistema>.csv`), la tabla con medianas, speedup y eficiencia
+(`resumen.csv`) y los gráficos están en la carpeta `resultados/`:
+
+| Gráfico | Qué muestra |
 |---|---|
-| `intuicion_pi`, `intuicion_e` | Los dos experimentos aleatorios |
-| `convergencia` | Estimaciones frente al valor real, con la banda teórica del 95 % |
-| `error_vs_n` | Error en escala log-log frente a la recta teórica σ/√N |
-| `serial_versiones_<sistema>` | Costo por muestra de V0, V1 y V2 |
-| `tiempo_vs_p_<sistema>` | Tiempo mediano de `mpi_v2` en función de P |
-| `speedup_<sistema>` | Speedup de `mpi_v2` en función de P, para cada N |
-| `speedup_v0_v2_<sistema>` | Speedup de la versión ingenua frente a la final |
-| `arranque_<sistema>` | Tiempo de cómputo frente a tiempo total del lanzamiento |
-| `eficiencia_sistemas` | Eficiencia paralela, comparando los sistemas medidos |
+| `intuicion.png` | Los dos experimentos con pocas muestras |
+| `convergencia.png` | Las estimaciones se acercan al valor real al aumentar N |
+| `error.png` | El error medido frente a la recta teórica σ/√N |
+| `tiempo_<sistema>.png` | Tiempo en función de la cantidad de procesos |
+| `speedup_<sistema>.png` | Speedup en función de la cantidad de procesos |
+| `eficiencia.png` | Eficiencia, comparando los sistemas |
 
-## Verificación
+## Limitaciones y mejoras futuras
 
-- Compilación sin advertencias con `-Wall -Wextra -Wpedantic`.
-- Ejecución con `-fsanitize=address,undefined` sin hallazgos.
-- `mpi_v2` con P = 1 produce exactamente el mismo resultado que `serial_v2`.
-- El reparto suma N también cuando N no es divisible por P.
-- `serial_v0` y `mpi_v0` rechazan los N que desbordarían sus contadores `int`.
+- Las semillas distintas por proceso hacen que cada uno use otra parte de la secuencia de
+  `drand48`, pero no garantizan que esas partes no se solapen. Una mejora es usar un generador
+  pensado para paralelo, con secuencias independientes garantizadas por proceso (por ejemplo
+  xoshiro256\*\* con su función de salto, o generadores basados en contador como Philox).
+- Combinar MPI con OpenMP para usar hilos dentro de cada nodo.
+- Usar secuencias de baja discrepancia (cuasi-Monte Carlo, Sobol o Halton), que bajan el error
+  cerca de 1/N en lugar de 1/√N.
+- Vectorizar el cálculo (SIMD) o llevarlo a GPU, ya que todas las muestras son independientes.
 
-## Referencias
+## Bibliografía
 
-- D. Blackman y S. Vigna, *Scrambled Linear Pseudorandom Number Generators*, ACM TOMS, 2021. Generador xoshiro256\*\* y función de salto: <https://prng.di.unimi.it/>
-- Message Passing Interface Forum, *MPI: A Message-Passing Interface Standard*.
+- N. Metropolis, S. Ulam. *The Monte Carlo Method*. Journal of the American Statistical Association, 1949.
+- P. Pacheco. *An Introduction to Parallel Programming*. Morgan Kaufmann.
+- W. Gropp, E. Lusk, A. Skjellum. *Using MPI*. MIT Press.
+- Documentación de Open MPI: <https://www.open-mpi.org/doc/>
+- Página de manual de `drand48(3)` (generador congruencial lineal de 48 bits).
+- G. Amdahl. *Validity of the single processor approach to achieving large scale computing capabilities*. 1967.
+- J. Gustafson. *Reevaluating Amdahl's Law*. Communications of the ACM, 1988.
