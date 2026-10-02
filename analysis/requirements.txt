@@ -1,0 +1,5 @@
+# Dependencias de los scripts de análisis y gráficos.
+# Instalar con:  python -m pip install -r analysis/requirements.txt
+numpy>=1.26
+pandas>=2.2
+matplotlib>=3.8
