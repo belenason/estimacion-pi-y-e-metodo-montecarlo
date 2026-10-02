@@ -132,6 +132,22 @@ Los tiempos medidos (`tiempos_<sistema>.csv`), la tabla con medianas, speedup y 
   cerca de 1/N en lugar de 1/√N.
 - Vectorizar el cálculo (SIMD) o llevarlo a GPU, ya que todas las muestras son independientes.
 
+## Guías de estudio
+
+En `apuntes_defensa/` hay apuntes para preparar la defensa oral, y en `docs/` un borrador del informe:
+
+| Archivo | Contenido | Se refiere a |
+|---|---|---|
+| [01_introduccion_y_planteo.md](apuntes_defensa/01_introduccion_y_planteo.md) | Guion de apertura, los dos experimentos, ejemplos a mano y demostraciones | Las dos ramas |
+| [02_codigo_linea_por_linea.md](apuntes_defensa/02_codigo_linea_por_linea.md) | El código explicado bloque por bloque; conceptos de C y funciones de MPI | Rama `main` |
+| [03_graficos_speedup_y_conclusiones.md](apuntes_defensa/03_graficos_speedup_y_conclusiones.md) | Cómo leer cada gráfico, resultados medidos, conclusiones y mejoras futuras | Rama `main` |
+| [04_version_simple.md](apuntes_defensa/04_version_simple.md) | Diferencias entre las dos ramas, justificación de cada decisión y cómo correr las pruebas | Rama `version-simple` |
+| [05_ideas_de_mejora.md](apuntes_defensa/05_ideas_de_mejora.md) | Mejoras candidatas para la versión simple, ordenadas por conveniencia | Rama `version-simple` |
+| [ANALYSIS_AND_CONCLUSIONS.md](docs/ANALYSIS_AND_CONCLUSIONS.md) | Borrador del informe: metodología, tablas y conclusiones | Rama `main` |
+
+El repositorio tiene dos ramas: `main` (versión completa, con tres versiones seriales y generador
+xoshiro256\*\*) y `version-simple` (versión reducida, con un programa serial y uno MPI).
+
 ## Bibliografía
 
 - N. Metropolis, S. Ulam. *The Monte Carlo Method*. Journal of the American Statistical Association, 1949.

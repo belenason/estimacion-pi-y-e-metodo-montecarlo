@@ -11,13 +11,6 @@ results/quick/
 __pycache__/
 *.pyc
 
-# Material privado: apuntes de estudio para la defensa e informe académico
-# (el informe se entrega por otro medio, no por GitHub)
-apuntes_defensa/
-docs/
-DEFENSE_GUIDE.md
-ANALYSIS_AND_CONCLUSIONS.md
-
 # Archivos de editor y sistema
 .vscode/
 .DS_Store
