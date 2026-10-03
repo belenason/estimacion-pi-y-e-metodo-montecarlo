@@ -62,9 +62,10 @@ La única comunicación es un envío al principio y una suma al final, sin impor
 
 | Archivo | Contenido |
 |---|---|
-| `montecarlo.h` | Los dos experimentos, lectura de argumentos y salida |
-| `montecarlo_serial.c` | Versión serial (referencia para el speedup) |
-| `montecarlo_mpi.c` | Versión paralela con MPI |
+| `montecarlo.h` | Lectura de argumentos, constantes y salida compartidas |
+| `montecarlo_pi.h`, `montecarlo_e.h` | Rutinas de cada experimento |
+| `montecarlo_pi_serial.c`, `montecarlo_e_serial.c` | Programas seriales, referencia para el speedup |
+| `montecarlo_pi_mpi.c`, `montecarlo_e_mpi.c` | Programas paralelos con MPI |
 | `Makefile` | Compilación |
 | `benchmark.sh` | Corre todas las pruebas y guarda los tiempos en un CSV |
 | `verificar_sistema.sh` | Comprueba que estén las herramientas y cuántos núcleos hay disponibles |
@@ -79,12 +80,14 @@ Requisitos: gcc, make, Open MPI, y Python 3 con numpy, pandas y matplotlib
 ```bash
 make
 
-./montecarlo_serial pi 100000000
-./montecarlo_serial e 100000000
-mpirun -np 4 ./montecarlo_mpi pi 100000000
+./montecarlo_pi_serial 100000000
+./montecarlo_e_serial 100000000
+mpirun -np 4 ./montecarlo_pi_mpi 100000000
+mpirun -np 4 ./montecarlo_e_mpi 100000000
 ```
 
-Cada programa imprime una línea: `constante,N,P,semilla,estimacion,error_abs,tiempo_s`.
+Cada programa recibe `N [semilla]`; la semilla es opcional y por defecto vale 12345. Cada ejecución
+imprime una línea: `constante,N,P,semilla,estimacion,error_abs,tiempo_s`.
 
 ## Pruebas
 

@@ -9,8 +9,8 @@ Contenido:
 1. Conceptos de C que aparecen en el código
 2. `Makefile`
 3. `montecarlo.h`
-4. `montecarlo_serial.c`
-5. `montecarlo_mpi.c`
+4. Programas seriales
+5. Programas MPI
 6. `benchmark.sh`
 7. `verificar_sistema.sh`
 8. `graficos.py`
@@ -24,10 +24,14 @@ Los recuadros **"¿Por qué así y no de otra forma?"** son las respuestas para 
 ## 0. Mapa del proyecto
 
 ```
-montecarlo.h            los dos experimentos, la lectura de argumentos y la salida (compartido)
-montecarlo_serial.c     versión serial: la referencia para el speedup
-montecarlo_mpi.c        versión paralela con MPI
-Makefile                cómo se compilan los dos programas
+montecarlo.h            lectura de argumentos, constantes y salida compartidas
+montecarlo_pi.h         experimento y estimación de pi
+montecarlo_e.h          experimento y estimación de e
+montecarlo_pi_serial.c  estimación serial de pi
+montecarlo_e_serial.c   estimación serial de e
+montecarlo_pi_mpi.c     estimación paralela de pi con MPI
+montecarlo_e_mpi.c      estimación paralela de e con MPI
+Makefile                cómo se compilan los cuatro programas
 benchmark.sh            corre todas las pruebas y guarda los tiempos en un CSV
 verificar_sistema.sh    comprobación previa: herramientas, núcleos y una prueba de escalado
 graficos.py             mediana, speedup, eficiencia, error y los gráficos
@@ -35,23 +39,24 @@ requirements.txt        librerías de Python necesarias
 resultados/             lo que generan benchmark.sh y graficos.py
 ```
 
-**Los dos programas tienen la misma forma:**
+**Cada programa estima una sola constante.** Los cuatro tienen la misma estructura general:
 
-1. Leer los argumentos: qué constante (`pi` o `e`), N y, opcionalmente, la semilla.
+1. Leer N y, opcionalmente, la semilla.
 2. Inicializar el generador de números aleatorios.
 3. Tomar el tiempo, ejecutar el experimento, tomar el tiempo otra vez.
 4. Convertir el contador en la estimación.
 5. Imprimir una línea CSV.
 
-La diferencia es que la versión MPI reparte las N muestras entre P procesos y al final suma los
-contadores.
+La versión MPI reparte las N muestras entre P procesos y al final suma los contadores. π y e tienen
+archivos y ejecutables propios, por lo que ya no hay un argumento para elegir la constante.
 
 Se usan así:
 
 ```bash
-./montecarlo_serial pi 1000000
-./montecarlo_serial e 1000000 42          # con semilla 42
-mpirun -np 4 ./montecarlo_mpi pi 100000000
+./montecarlo_pi_serial 1000000
+./montecarlo_e_serial 1000000 42           # con semilla 42
+mpirun -np 4 ./montecarlo_pi_mpi 100000000
+mpirun -np 4 ./montecarlo_e_mpi 100000000
 ```
 
 y cada ejecución imprime una línea con siete campos:
@@ -91,8 +96,8 @@ hace que cada `CONSTANTE_PI` del código se reemplace por `0`. Sirve para dar no
 | `long long` | al menos 64 bits | hasta ≈ 9,2 × 10¹⁸ | N, contadores, semilla |
 | `double` | 64 bits, punto flotante | ≈ 15–16 dígitos significativos | coordenadas, sumas, estimación, tiempos |
 
-**Arreglos** — `long long datos[3]` son tres `long long` seguidos en memoria: `datos[0]`,
-`datos[1]` y `datos[2]`. Cuando un arreglo se pasa a una función, en realidad se pasa **la
+**Arreglos** — `long long datos[2]` son dos `long long` seguidos en memoria: `datos[0]` y
+`datos[1]`. Cuando un arreglo se pasa a una función, en realidad se pasa **la
 dirección** de su primer elemento. Por eso `leer_argumentos(argc, argv, datos)` puede escribir
 dentro de `datos` y el cambio se ve en `main`.
 
@@ -106,15 +111,14 @@ escriba queda en **mi** cuaderno.
 **`struct`** — varias variables agrupadas. `struct timespec` (de la biblioteca estándar) tiene dos
 campos: `tv_sec` (segundos) y `tv_nsec` (nanosegundos). Se accede con punto: `t.tv_sec`.
 
-**`static` delante de una función** — la función es privada del archivo donde queda. Como
-`montecarlo.h` se incluye en los dos `.c`, cada programa recibe su propia copia y no hay conflicto.
+**`static` delante de una función** — la función es privada del archivo donde queda. Cada programa
+incluye el header común y el de su experimento, así recibe sus propias funciones sin conflicto.
 
 **Operador ternario** — `condición ? valor_si_verdadero : valor_si_falso`. Es un `if/else` que
-devuelve un valor: `(argc >= 4) ? atoll(argv[3]) : 12345`.
+devuelve un valor: `(argc >= 3) ? atoll(argv[2]) : 12345`.
 
 **Conversión explícita (cast)** — `(double)cuenta` convierte un entero a real. Hace falta antes de
-dividir: `7 / 2` entre enteros da `3`; `(double)7 / 2` da `3.5`. `(int)datos[0]` convierte un
-`long long` a `int`.
+dividir: `7 / 2` entre enteros da `3`; `(double)7 / 2` da `3.5`.
 
 **`argc` y `argv`** — los argumentos de la línea de comandos. `argc` cuenta cuántos hay, incluido
 el nombre del programa; `argv[0]` es el nombre, `argv[1]` el primero, etc. Son textos.
@@ -139,24 +143,23 @@ CFLAGS = -O2 -Wall -Wextra
 | `-Wall -Wextra` | Activa las advertencias. El proyecto compila sin ninguna |
 
 ```make
-all: montecarlo_serial montecarlo_mpi
+all: montecarlo_pi_serial montecarlo_e_serial montecarlo_pi_mpi montecarlo_e_mpi
 ```
 
-`all` es el objetivo por defecto: `make` sin argumentos compila los dos programas.
+`all` es el objetivo por defecto: `make` sin argumentos compila los cuatro programas.
 
 ```make
-montecarlo_serial: montecarlo_serial.c montecarlo.h
-	gcc $(CFLAGS) montecarlo_serial.c -o montecarlo_serial -lm
+montecarlo_pi_serial: montecarlo_pi_serial.c montecarlo.h montecarlo_pi.h
+    gcc $(CFLAGS) montecarlo_pi_serial.c -o montecarlo_pi_serial -lm
 ```
 
-"Para generar `montecarlo_serial` hacen falta `montecarlo_serial.c` y `montecarlo.h`; si alguno
-cambió, ejecutar este comando." `-o` da el nombre del ejecutable; `-lm` enlaza la biblioteca
-matemática (para `fabs`). Como `montecarlo.h` figura entre las dependencias, si cambia el `.h` se
-recompilan los dos programas.
+La misma regla se repite para el programa serial de e y los dos MPI. `-o` da el nombre del
+ejecutable; `-lm` enlaza la biblioteca matemática (para `fabs`). Cada regla depende del header común
+y del específico que utiliza.
 
 ```make
-montecarlo_mpi: montecarlo_mpi.c montecarlo.h
-	mpicc $(CFLAGS) montecarlo_mpi.c -o montecarlo_mpi -lm
+montecarlo_pi_mpi: montecarlo_pi_mpi.c montecarlo.h montecarlo_pi.h
+    mpicc $(CFLAGS) montecarlo_pi_mpi.c -o montecarlo_pi_mpi -lm
 ```
 
 `mpicc` es un envoltorio de `gcc` que agrega las rutas y bibliotecas de MPI. Por dentro es el mismo compilador.
@@ -198,7 +201,7 @@ Los valores reales, para calcular el error, y dos nombres para identificar qué 
 > **¿Por qué no `M_PI`?** No es parte del estándar C; depende de cómo se compile. Definirlo a mano
 > es portable y deja a la vista el valor usado.
 
-### 3.2 `contar_aciertos_pi` — el experimento de π
+### 3.2 `contar_aciertos_pi` — el experimento de π (`montecarlo_pi.h`)
 
 ```c
 static long long contar_aciertos_pi(long long n)
@@ -239,7 +242,7 @@ static long long contar_aciertos_pi(long long n)
 > salto. En la rama `main` se probó escribir `aciertos += (condición)` directamente y no cambió el
 > tiempo: el costo dominante es generar los números aleatorios. Se dejó el `if` porque es más claro.
 
-### 3.3 `contar_sumandos_e` — el experimento de e
+### 3.3 `contar_sumandos_e` — el experimento de e (`montecarlo_e.h`)
 
 ```c
 static long long contar_sumandos_e(long long n)
@@ -311,14 +314,11 @@ valor fijo (0x330E).
 > (xoshiro256\*\*, en la rama `main`) es más rápida y de mejor calidad, a cambio de unas 60 líneas
 > de código con operaciones de bits.
 
-### 3.5 `calcular_estimacion`
+### 3.5 `calcular_estimacion_pi` y `calcular_estimacion_e`
 
-```c
-if (constante == CONSTANTE_PI) {
-    return 4.0 * (double)cuenta / (double)n;    /* pi = 4 * aciertos / N */
-}
-return (double)cuenta / (double)n;              /* e = sumandos / N */
-```
+En `montecarlo_pi.h`, `calcular_estimacion_pi` devuelve
+`4.0 * (double)aciertos / (double)n`. En `montecarlo_e.h`, `calcular_estimacion_e` devuelve
+`(double)sumandos / (double)n`. Cada ejecutable llama solo a la fórmula que le corresponde.
 
 Convierte el contador en la estimación. Los `(double)` fuerzan la división real: sin ellos,
 `cuenta / n` entre enteros daría 0 (π) o 2 (e).
@@ -329,44 +329,33 @@ Convierte el contador en la estimación. Los `(double)` fuerzan la división rea
 ### 3.6 `leer_argumentos`
 
 ```c
-static int leer_argumentos(int argc, char *argv[], long long datos[3])
+static int leer_argumentos(int argc, char *argv[], long long datos[2])
 ```
 
-Recibe los argumentos de la línea de comandos y deja tres valores en `datos`: la constante, N y la
-semilla. Devuelve 1 si son válidos y 0 si no.
+Recibe los argumentos de la línea de comandos y deja dos valores en `datos`: N y la semilla.
+Devuelve 1 si son válidos y 0 si no.
 
 ```c
-if (argc < 3) {
-    fprintf(stderr, "Uso: %s <pi|e> <N> [semilla]\n", argv[0]);
+if (argc < 2) {
+    fprintf(stderr, "Uso: %s <N> [semilla]\n", argv[0]);
     return 0;
 }
 ```
 
-Hacen falta al menos 3: el nombre del programa, la constante y N. `fprintf(stderr, …)` escribe en
+Hace falta al menos 2: el nombre del programa y N. `fprintf(stderr, …)` escribe en
 la **salida de errores**, separada de la salida normal: así un mensaje de error no se mezcla con la
 línea CSV que guarda el script.
 
 ```c
-if (strcmp(argv[1], "pi") == 0) {
-    datos[0] = CONSTANTE_PI;
-} else if (strcmp(argv[1], "e") == 0) {
-    datos[0] = CONSTANTE_E;
-} else { ... return 0; }
-```
-
-`strcmp` compara dos textos y devuelve 0 si son iguales. (En C no se pueden comparar textos con `==`:
-eso compara direcciones de memoria, no contenidos.)
-
-```c
-datos[1] = atoll(argv[2]);
-if (datos[1] <= 0) { ... return 0; }
+datos[0] = atoll(argv[1]);
+if (datos[0] <= 0) { ... return 0; }
 ```
 
 `atoll` convierte texto en `long long`. Se exige N > 0: con N = 0 habría una división por cero al
 calcular la estimación.
 
 ```c
-datos[2] = (argc >= 4) ? atoll(argv[3]) : 12345;
+datos[1] = (argc >= 3) ? atoll(argv[2]) : 12345;
 ```
 
 La semilla es opcional; si no se pasa, se usa 12345.
@@ -381,22 +370,54 @@ La semilla es opcional; si no se pasa, se usa 12345.
 ### 3.7 `imprimir_resultado`
 
 ```c
-double real = (constante == CONSTANTE_PI) ? PI_REAL : E_REAL;
+const char *nombre;
+double valor_real;
+
+if (constante == CONSTANTE_PI) {
+    nombre = "pi";
+    valor_real = PI_REAL;
+} else {
+    nombre = "e";
+    valor_real = E_REAL;
+}
+
+double error_absoluto = fabs(estimacion - valor_real);
 
 printf("%s,%lld,%d,%lld,%.10f,%.3e,%.6f\n",
-       (constante == CONSTANTE_PI) ? "pi" : "e",
-       n, procesos, semilla, estimacion, fabs(estimacion - real), tiempo);
+       nombre, n, procesos, semilla, estimacion, error_absoluto, tiempo);
 ```
 
-Una línea CSV. `%lld` es el formato de `long long`; `%.10f`, 10 decimales; `%.3e`, notación
-científica; `fabs`, valor absoluto de un `double`.
+En tres pasos:
+
+1. Según la constante, elige el nombre que va en el CSV (`"pi"` o `"e"`) y el valor real contra el
+   que se compara. `const char *nombre` es un texto que no se modifica.
+2. Calcula el error absoluto: `fabs` es el valor absoluto de un `double`.
+3. Imprime la línea CSV. Cada `%` del formato corresponde, en orden, a uno de los valores que siguen:
+
+| Formato | Valor | Significado |
+|---|---|---|
+| `%s` | `nombre` | texto |
+| `%lld` | `n` | `long long` |
+| `%d` | `procesos` | `int` |
+| `%lld` | `semilla` | `long long` |
+| `%.10f` | `estimacion` | real con 10 decimales |
+| `%.3e` | `error_absoluto` | notación científica con 3 decimales |
+| `%.6f` | `tiempo` | real con 6 decimales (microsegundos) |
+
+> **¿Por qué un `if` y no el operador ternario?** Las dos decisiones dependen de la misma
+> pregunta (¿es π?). Con un solo `if` se pregunta una vez y se ve junto todo lo que cambia entre
+> π y e. Calcular el error en una variable con nombre, antes del `printf`, hace que la línea de
+> impresión solo imprima.
 
 > **¿Por qué CSV y no un mensaje para humanos?** Porque los resultados los procesa un script: el
 > benchmark solo agrega cada línea a un archivo y Python lo lee directo.
 
 ---
 
-## 4. `montecarlo_serial.c`
+## 4. Programas seriales
+
+`montecarlo_pi_serial.c` estima pi y `montecarlo_e_serial.c` estima e. Ambos reciben `N [semilla]`;
+el nombre del ejecutable determina el experimento.
 
 ```c
 static double segundos(void)
@@ -416,14 +437,13 @@ segundos enteros y los nanosegundos convertidos a segundos.
 > hora en medio de la medición. Es el equivalente de `MPI_Wtime()` de la versión paralela.
 
 ```c
-long long datos[3];
+long long datos[2];
 
 if (!leer_argumentos(argc, argv, datos)) {
     return 1;
 }
-int constante = (int)datos[0];
-long long n = datos[1];
-long long semilla = datos[2];
+long long n = datos[0];
+long long semilla = datos[1];
 ```
 
 Lee los argumentos; si son inválidos, termina con código 1. Después copia cada dato a una variable
@@ -438,12 +458,8 @@ Inicializa el generador.
 ```c
 double inicio = segundos();
 
-long long cuenta;
-if (constante == CONSTANTE_PI) {
-    cuenta = contar_aciertos_pi(n);
-} else {
-    cuenta = contar_sumandos_e(n);
-}
+long long aciertos = contar_aciertos_pi(n);  /* programa de pi */
+/* En el programa de e, esta línea es: long long sumandos = contar_sumandos_e(n); */
 
 double fin = segundos();
 ```
@@ -451,21 +467,25 @@ double fin = segundos();
 Solo se cronometra el experimento: ni la lectura de argumentos ni la impresión.
 
 ```c
-double estimacion = calcular_estimacion(constante, cuenta, n);
-imprimir_resultado(constante, n, 1, semilla, estimacion, fin - inicio);
+double estimacion = calcular_estimacion_pi(aciertos, n);  /* programa de pi */
+imprimir_resultado(CONSTANTE_PI, n, 1, semilla, estimacion, fin - inicio);
 return 0;
 ```
 
-El `1` es P: la versión serial usa un proceso.
+En `montecarlo_e_serial.c` se llama a `calcular_estimacion_e(sumandos, n)` y se pasa
+`CONSTANTE_E` a `imprimir_resultado`. El `1` es P: la versión serial usa un proceso.
 
 > **¿Para qué existe la versión serial si la MPI con P = 1 hace lo mismo?** Porque el speedup se
 > define contra el **mejor programa serial**, sin nada de MPI. Así la comparación incluye lo que
-> cuesta usar MPI. Además sirve de verificación: con la misma semilla, `montecarlo_mpi` con un
-> proceso da exactamente el mismo resultado que `montecarlo_serial` (lo comprobé).
+> cuesta usar MPI. Además sirve de verificación: con la misma semilla, el ejecutable MPI de cada
+> constante con un proceso da exactamente el mismo resultado que su ejecutable serial.
 
 ---
 
-## 5. `montecarlo_mpi.c`
+## 5. Programas MPI
+
+`montecarlo_pi_mpi.c` y `montecarlo_e_mpi.c` siguen el mismo esquema, pero cada uno contiene
+únicamente el cálculo de su constante.
 
 ### 5.1 Qué es MPI, en simple
 
@@ -477,13 +497,13 @@ por mensaje.
 Analogía: P empleados en oficinas separadas, todos con el mismo manual. El manual dice "si sos el
 número 0, hacé esto; todos, hagan aquello". Se comunican solo por correo.
 
-`mpirun -np 4 ./montecarlo_mpi pi 1000000` lanza 4 copias.
+`mpirun -np 4 ./montecarlo_pi_mpi 1000000` lanza 4 copias del estimador de pi.
 
 ### 5.2 El código, bloque por bloque
 
 ```c
 int rank, procesos;
-long long datos[3] = {0, 0, 0};     /* constante, N, semilla */
+long long datos[2] = {0, 0};       /* N, semilla */
 
 MPI_Init(&argc, &argv);
 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -503,7 +523,7 @@ if (rank == 0) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
-MPI_Bcast(datos, 3, MPI_LONG_LONG, 0, MPI_COMM_WORLD);
+MPI_Bcast(datos, 2, MPI_LONG_LONG, 0, MPI_COMM_WORLD);
 ```
 
 Solo el proceso 0 interpreta los argumentos. `MPI_Bcast` (*broadcast*, difusión) envía un dato del
@@ -512,13 +532,13 @@ proceso raíz a todos:
 | Argumento | Valor | Significado |
 |---|---|---|
 | buffer | `datos` | qué se envía / dónde se recibe |
-| cantidad | `3` | cuántos elementos |
+| cantidad | `2` | cuántos elementos |
 | tipo | `MPI_LONG_LONG` | de qué tipo son |
 | raíz | `0` | quién envía |
 | comunicador | `MPI_COMM_WORLD` | a qué grupo |
 
 **Todos** los procesos ejecutan la misma línea: en el 0 significa "enviar"; en los demás,
-"recibir". Después de esa línea, todos tienen los mismos tres valores.
+"recibir". Después de esa línea, todos tienen los mismos dos valores.
 
 > **¿Por qué `MPI_Bcast` si cada proceso podría leer `argv`?** En la práctica `mpirun` suele pasar
 > los argumentos a todos, pero el estándar MPI no lo garantiza. Con un único punto de lectura y una
@@ -530,9 +550,8 @@ proceso raíz a todos:
 > **¿Por qué en un arreglo?** Una sola comunicación en lugar de tres.
 
 ```c
-int constante = (int)datos[0];
-long long n = datos[1];
-long long semilla = datos[2];
+long long n = datos[0];
+long long semilla = datos[1];
 ```
 
 **Paso 2 — repartir el trabajo**
@@ -611,22 +630,17 @@ El proceso 0 usa la semilla, el 1 usa semilla + 1, y así.
 MPI_Barrier(MPI_COMM_WORLD);
 double inicio = MPI_Wtime();
 
-long long cuenta_local;
-if (constante == CONSTANTE_PI) {
-    cuenta_local = contar_aciertos_pi(n_local);
-} else {
-    cuenta_local = contar_sumandos_e(n_local);
-}
+long long aciertos_local = contar_aciertos_pi(n_local);
 
-long long cuenta_total = 0;
-MPI_Reduce(&cuenta_local, &cuenta_total, 1, MPI_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
+long long aciertos_total = 0;
+MPI_Reduce(&aciertos_local, &aciertos_total, 1, MPI_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
 
 double fin = MPI_Wtime();
 ```
 
 - **`MPI_Barrier`**: nadie pasa de esta línea hasta que **todos** llegaron. Es la línea de largada.
 - **`MPI_Wtime`**: tiempo de reloj en segundos (`double`).
-- Cada proceso ejecuta el mismo experimento que la versión serial, con `n_local` muestras y **sin comunicarse**.
+- Cada proceso ejecuta el experimento de su programa (pi o e) con `n_local` muestras y **sin comunicarse**.
 - **`MPI_Reduce`**: combina un valor de cada proceso en uno solo, en el proceso raíz.
 
 | Argumento | Valor | Significado |
@@ -664,8 +678,8 @@ double fin = MPI_Wtime();
 
 ```c
 if (rank == 0) {
-    double estimacion = calcular_estimacion(constante, cuenta_total, n);
-    imprimir_resultado(constante, n, procesos, semilla, estimacion, fin - inicio);
+    double estimacion = calcular_estimacion_pi(aciertos_total, n);  /* programa de pi */
+    imprimir_resultado(CONSTANTE_PI, n, procesos, semilla, estimacion, fin - inicio);
 }
 
 MPI_Finalize();
@@ -687,15 +701,15 @@ todos:      inicio = MPI_Wtime()
 todos:      experimento con n_local    (sin comunicarse)
 todos:      MPI_Reduce                 (los contadores se suman en el proceso 0)
 todos:      fin = MPI_Wtime()
-proceso 0:  calcula la estimación e imprime
+proceso 0:  calcula la estimación de su constante e imprime
 todos:      MPI_Finalize
 ```
 
 Comunicaciones en total: **una difusión y una reducción**, sin importar N.
 
-> **¿Por qué el serial y el paralelo comparten `montecarlo.h`?** Para que ejecuten **exactamente el
-> mismo código** de cómputo. Así el speedup mide solo el efecto de repartir el trabajo, no dos
-> implementaciones distintas.
+> **¿Por qué el serial y el paralelo comparten el header del experimento?** Para que ejecuten
+> **exactamente el mismo código** de cómputo. Así el speedup mide solo el efecto de repartir el
+> trabajo, no dos implementaciones distintas.
 
 ---
 
@@ -742,14 +756,16 @@ La primera línea del CSV: los nombres de las columnas.
 
 ```bash
 for CONSTANTE in pi e; do
+    SERIAL=./montecarlo_${CONSTANTE}_serial
+    PARALELO=./montecarlo_${CONSTANTE}_mpi
     for N in $TAMANIOS; do
         for REP in $(seq 1 $REPETICIONES); do
             SEMILLA=$((REP * 100000))
-            echo "serial,$(./montecarlo_serial $CONSTANTE $N $SEMILLA)" >> $SALIDA
+            echo "serial,$($SERIAL $N $SEMILLA)" >> $SALIDA
 
             for P in $PROCESOS; do
                 SEMILLA=$((REP * 100000 + P * 1000))
-                echo "mpi,$(mpirun $OPCIONES_MPI -np $P ./montecarlo_mpi $CONSTANTE $N $SEMILLA)" >> $SALIDA
+                echo "mpi,$(mpirun $OPCIONES_MPI -np $P $PARALELO $N $SEMILLA)" >> $SALIDA
             done
         done
     done
@@ -853,9 +869,9 @@ cada uno y por qué tiene esa forma está en el apunte 03.
 
 - Compila sin advertencias con `-Wall -Wextra`.
 - Las estimaciones caen dentro del margen estadístico esperado.
-- Con la misma semilla, `montecarlo_mpi` con un proceso da exactamente el mismo resultado que `montecarlo_serial`.
+- Con la misma semilla, el ejecutable MPI con un proceso da el mismo resultado que el serial de la misma constante.
 - La fórmula de reparto se comprobó con 20 000 combinaciones al azar de N y P: siempre suma exactamente N y la diferencia entre procesos nunca pasa de 1.
-- Argumentos inválidos (sin argumentos, N negativo, constante desconocida) se rechazan con un mensaje.
+- Argumentos inválidos (sin argumentos o N no positivo) se rechazan con un mensaje.
 - El error de las ejecuciones paralelas sigue la ley teórica (40 ejecuciones con 8 procesos: cociente medido/teórico 1,01 en π y 0,84 en e).
 
 ---

@@ -37,6 +37,8 @@ fi
 echo "programa,constante,N,P,semilla,estimacion,error_abs,tiempo_s" > $SALIDA
 
 for CONSTANTE in pi e; do
+    SERIAL=./montecarlo_${CONSTANTE}_serial
+    PARALELO=./montecarlo_${CONSTANTE}_mpi
     for N in $TAMANIOS; do
         echo "$CONSTANTE con N = $N"
         for REP in $(seq 1 $REPETICIONES); do
@@ -45,11 +47,11 @@ for CONSTANTE in pi e; do
             # entre semillas: así ninguna ejecución repite la semilla de otra
             # (vale mientras P sea menor que 100 y cada proceso sume menos de 1000).
             SEMILLA=$((REP * 100000))
-            echo "serial,$(./montecarlo_serial $CONSTANTE $N $SEMILLA)" >> $SALIDA
+            echo "serial,$($SERIAL $N $SEMILLA)" >> $SALIDA
 
             for P in $PROCESOS; do
                 SEMILLA=$((REP * 100000 + P * 1000))
-                echo "mpi,$(mpirun $OPCIONES_MPI -np $P ./montecarlo_mpi $CONSTANTE $N $SEMILLA)" >> $SALIDA
+                echo "mpi,$(mpirun $OPCIONES_MPI -np $P $PARALELO $N $SEMILLA)" >> $SALIDA
             done
         done
     done

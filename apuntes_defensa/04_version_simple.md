@@ -167,7 +167,7 @@ eficiencia con las dos líneas.
 | Consigna | Dónde |
 |---|---|
 | Investigar el problema, objetivos, limitaciones y estrategias | README: "El problema", "Convergencia", "Limitaciones". Apunte 01 |
-| Implementación paralela, de la manera más adecuada de paralelizar | `montecarlo_mpi.c`. README: "Cómo se paralelizó". Apunte 02, sección 5 |
+| Implementación paralela, de la manera más adecuada de paralelizar | `montecarlo_pi_mpi.c` y `montecarlo_e_mpi.c`. README: "Cómo se paralelizó". Apunte 02, sección 5 |
 | Seleccionar o generar los datos para las pruebas | Los datos son los números aleatorios; se generan con `drand48` y semillas controladas |
 | Correr en diferentes sistemas | `./benchmark.sh pc` y `./benchmark.sh cluster_boogie` (sección 1) |
 | Speedup con la mediana de múltiples ejecuciones | `graficos.py`, función `calcular_resumen` |
@@ -191,7 +191,7 @@ más extensa que se hizo antes, con más optimizaciones y más análisis. Para c
 
 | | `version-simple` | `main` |
 |---|---|---|
-| Programas | 2 (`montecarlo_serial`, `montecarlo_mpi`) | 5 (`serial_v0/v1/v2`, `mpi_v0/v2`) |
+| Programas | 4 (serial y MPI para π y para e) | 5 (`serial_v0/v1/v2`, `mpi_v0/v2`) |
 | Código C | unas 230 líneas, 3 archivos | unas 650 líneas, 7 archivos |
 | Generador | `drand48()` de la biblioteca estándar | xoshiro256\*\* propio, con `splitmix64` y `jump()` |
 | Números por proceso | Semilla + número de proceso (sin garantía formal) | Tramos disjuntos garantizados (`jump`) |

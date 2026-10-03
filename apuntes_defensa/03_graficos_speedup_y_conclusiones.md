@@ -45,8 +45,9 @@ el programa cuando nada lo molesta.
 **¿Por qué 5 repeticiones?** Impar, para que la mediana sea una medición real y no el promedio de
 dos. Con 5, hasta dos ejecuciones perturbadas no cambian el resultado.
 
-**¿Contra qué se calcula el speedup?** Contra `montecarlo_serial`, no contra `montecarlo_mpi` con un
-proceso. Es la comparación honesta: incluye lo que cuesta usar MPI.
+**¿Contra qué se calcula el speedup?** Contra el programa serial de la misma constante
+(`montecarlo_pi_serial` o `montecarlo_e_serial`), no contra el MPI con un proceso. Es la comparación
+honesta: incluye lo que cuesta usar MPI.
 
 ---
 
@@ -237,7 +238,7 @@ Qué se espera, a confirmar con las mediciones:
 1. **Eficiencia más alta y más estable en el clúster** mientras P no supere los núcleos físicos asignados.
 2. **Un núcleo del clúster puede ser más lento que uno de la notebook.** Los procesadores de servidor
    priorizan muchos núcleos a frecuencia moderada; la notebook, con un solo núcleo activo, usa un
-   turbo alto. No sorprenderse si `montecarlo_serial` tarda más en el clúster.
+   turbo alto. No sorprenderse si el programa serial tarda más en el clúster.
 3. **Más núcleos, speedup máximo mayor.**
 4. **Si los 24 "núcleos" son en realidad 12 físicos con dos hilos cada uno**, la curva se doblará
    pasando P = 12, igual que la notebook pasando P = 4. Lo dice la prueba de escalado de `verificar_sistema.sh`.

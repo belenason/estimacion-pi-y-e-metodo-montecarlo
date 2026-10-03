@@ -29,9 +29,9 @@ echo "  Usuario: $(whoami)"
 echo "== Prueba de escalado (pi, N = 2 x 10^8) =="
 make || exit 1
 echo "constante,N,P,semilla,estimacion,error_abs,tiempo_s"
-./montecarlo_serial pi 200000000 1
+./montecarlo_pi_serial 200000000 1
 for P in 1 $((MAX_P / 2)) $MAX_P; do
-    mpirun $OPCIONES_MPI -np $P ./montecarlo_mpi pi 200000000 1
+    mpirun $OPCIONES_MPI -np $P ./montecarlo_pi_mpi 200000000 1
 done
 echo "Si el tiempo con $MAX_P procesos no es cerca de la mitad que con $((MAX_P / 2)),"
 echo "los núcleos asignados son hilos lógicos y no núcleos físicos (o hay menos de $MAX_P)."
