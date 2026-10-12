@@ -24,7 +24,7 @@ git switch version-simple
 ```
 
 Tarda alrededor de 20 a 25 minutos con los valores por defecto (estimación a partir de una prueba
-informal: unos 19 ns por muestra para π y 46 ns para e). **Dejar la notebook enchufada y sin usar
+informal: unos 20 ns por muestra para π y 45 a 55 ns para e). **Dejar la notebook enchufada y sin usar
 mientras corre**; en la corrida de `main` la máquina cambió de velocidad a mitad de camino y hubo
 que repetir mediciones.
 
@@ -213,10 +213,55 @@ operaciones de bits. Lo que `main` tiene de más es material para responder "¿q
 
 | Lo que tiene `main` | Qué aporta | Qué se aprendió de eso |
 |---|---|---|
-| xoshiro256\*\* con `jump()` | Secuencias por proceso separadas por construcción, y un generador más rápido | Es la solución rigurosa al punto débil de `semilla + rank` |
-| Progresión V0 → V1 → V2 medida | Mide el efecto de cada optimización | Quitar la raíz cuadrada no cambió el tiempo (el compilador ya optimizaba y el costo dominante es el generador); cambiar el generador ganó unas 3 veces |
+| xoshiro256\*\* con `jump()` | Secuencias por proceso separadas por construcción, y un generador algo más rápido (ver abajo) | Es la solución rigurosa al punto débil de `semilla + rank` |
+| Progresión V0 → V1 → V2 medida | Mide el efecto de cada optimización | Quitar la raíz cuadrada no cambió el tiempo (el compilador ya optimizaba y el costo dominante es el generador); cambiar `rand()` por xoshiro ganó unas 3 veces (contra `drand48` la diferencia es mucho menor, ver abajo) |
 | Versión MPI ingenua (`mpi_v0`) | Comparar el escalado de un código lento y uno rápido | Escalan parecido, pero 8 procesos de la versión lenta apenas le ganan a 1 de la rápida: primero se optimiza el serial |
 | Tiempo total del lanzamiento | Mide el costo de arrancar MPI | En la notebook, unos 0,3 a 0,4 s fijos |
 | Avisos de coherencia | Detecta mediciones sospechosas | Hubo que repetir un bloque de mediciones porque la notebook cambió de velocidad a mitad de la corrida |
 
 Los apuntes de la rama `main` describen su propio código; los de esta rama describen la versión simple.
+
+### Por qué la versión final de `main` es más rápida (medido)
+
+Se hizo una prueba controlada: el mismo cálculo, cambiando **una diferencia por vez**, con 5
+repeticiones intercaladas. La notebook estaba en un estado lento (los valores absolutos son casi el
+doble de los del benchmark de `main`), así que **solo valen las comparaciones dentro de esta tabla**.
+Diferencias de menos de un 15 % están dentro del ruido: los rangos mínimo-máximo se superponen.
+
+| Configuración | π (ns por punto) | e (ns por ensayo) |
+|---|---|---|
+| `drand48`, `-O2`, `if` (la versión simple tal como está) | 23,4 | 56,4 |
+| `drand48`, `-O3 -march=native` | 24,4 | 52,4 |
+| xoshiro, conversión dividiendo por `UINT64_MAX`, `-O2`, `if` | 21,2 | 31,5 |
+| lo mismo, sumando la comparación en lugar del `if` | 19,4 | 38,3 |
+| xoshiro, división, `-O3 -march=native`, sumando (**la versión final de `main`**) | 19,2 | 30,2 |
+| xoshiro, conversión desplazando 11 bits, `-O2`, `if` | 5,8 | 21,2 |
+| xoshiro, desplazando, `-O3 -march=native`, sumando | 5,1 | 24,7 |
+
+Lo que muestra:
+
+1. **Las opciones de compilación no cambian nada** (23,4 contra 24,4 con `drand48`; 19,4 contra 19,2 con xoshiro).
+2. **`if` contra sumar la comparación:** dentro del ruido.
+3. **El generador:** pasar de `drand48` a xoshiro, con la conversión que usa `main`, acelera π apenas
+   1,1 a 1,2 veces y e casi 2 veces (56,4 → 30,2). No se investigó por qué `drand48` es más lento por
+   número en e que en π.
+4. **La conversión de entero a real es lo que más pesa en π:** dividir por `UINT64_MAX` contra
+   desplazar 11 bits da una diferencia de unas **3,7 veces** (21,2 → 5,8 con las mismas opciones). En
+   e pesa menos (1,2 a 1,5 veces), porque el `while` de largo impredecible domina el tiempo.
+
+**Por qué la conversión es lenta** (visto en el código de máquina que genera `gcc`): el procesador
+solo convierte a real enteros *con signo*. Para un entero sin signo de 64 bits, `gcc` agrega un
+`testq` y un salto `js` según el bit más alto. En un número aleatorio ese bit vale 1 la mitad de las
+veces y no se puede predecir, así que el procesador falla en el salto aproximadamente una vez de cada
+dos y pierde decenas de ciclos. Desplazando 11 bits a la derecha el número queda siempre positivo y
+no hay salto. Esta CPU no tiene AVX-512, que sí trae una conversión directa de enteros sin signo.
+
+**Qué decir y qué no decir:**
+
+- La versión final de `main` **no** es "mucho más rápida" que la simple: es unas 1,2 veces más rápida
+  en π y unas 1,9 en e.
+- La mejora de unas 3 veces que se midió en `main` entre V1 y V2 fue contra `rand()`, no contra `drand48`.
+- La mejora más grande disponible en π (casi 4 veces) no está en ninguna de las dos ramas: es la
+  conversión por desplazamiento. En `main` se descartó a propósito, para que la línea fuera fácil de explicar.
+- La prueba no se repitió con la notebook en estado rápido ni en el clúster. El orden de las
+  conclusiones debería mantenerse, pero los valores absolutos cambian.

@@ -16,6 +16,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Ejecutables de la version simple
-montecarlo_serial
-montecarlo_mpi
+# Ejecutables
+montecarlo_pi_serial
+montecarlo_e_serial
+montecarlo_pi_mpi
+montecarlo_e_mpi

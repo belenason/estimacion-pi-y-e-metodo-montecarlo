@@ -57,8 +57,8 @@ mitad de la corrida y la mediana lo escondía. En el clúster, que es compartido
 bloques de un millón de números), medida con un solo núcleo, como barra de comparación del costo por muestra.
 
 **Qué aporta.** Una comparación contra "la forma estándar de hacerlo en Python". Medición informal
-en la notebook con N = 10⁸: NumPy 17 ns por muestra en π y 34 ns en e; la versión simple, unos 19 y
-46 ns. O sea, el C propio queda parejo en π. No existe una librería que traiga este problema ya resuelto.
+en la notebook con N = 10⁸: NumPy 17 ns por muestra en π y 34 ns en e; la versión simple, unos 20 y
+45 a 55 ns (medidas en momentos distintos: orientativo). O sea, el C propio queda parejo en π. No existe una librería que traiga este problema ya resuelto.
 
 **Cómo se defiende.** "Comparé contra NumPy, que es la herramienta habitual. Queda parejo porque
 NumPy genera arreglos enteros en memoria y los recorre varias veces, mientras que el C trabaja
@@ -97,7 +97,8 @@ Ya está preparado; no requiere cambios. Comandos, lectura de la curva y qué de
 
 **Qué aporta.** Una conclusión del tipo "medir antes de optimizar". En `main` fue muy clara (quitar
 la raíz no ganó nada, cambiar el generador ganó 3 veces). En la versión simple el efecto sería
-menor: `drand48` ronda 19 ns por muestra contra 27 ns de `rand()`.
+menor, y no está medido en condiciones controladas: `drand48` y `rand()` se midieron en momentos
+distintos de la notebook, así que no hay una comparación confiable entre ellos.
 
 **Riesgo.** Un programa más y un gráfico más para una conclusión menos contundente.
 
@@ -106,7 +107,8 @@ menor: `drand48` ronda 19 ns por muestra contra 27 ns de `rand()`.
 **Qué es.** Reemplazar `drand48` por el generador de `main`.
 
 **Qué aporta.** Elimina el punto débil de `semilla + rank` (secuencias disjuntas garantizadas) y es
-más rápido (en `main`: 9,4 ns por muestra en π).
+algo más rápido: en una prueba controlada, 1,1 a 1,2 veces en π y casi 2 veces en e (apunte 04,
+sección 3). La mejora grande en π está en cómo se convierte el número a real, no en el generador.
 
 **Riesgo.** Abre las preguntas más difíciles: `splitmix64`, rotaciones de bits, por qué el salto
 equivale a 2¹²⁸ pasos. Declararlo como limitación conocida y mejora futura da casi el mismo crédito.

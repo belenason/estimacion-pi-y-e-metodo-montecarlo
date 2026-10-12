@@ -128,8 +128,8 @@ tiempo bajaría a la mitad; en la práctica baja algo menos (sección 5). Las l�
 irregulares porque se miden milisegundos o menos (sección 6).
 
 **e tarda más que π** a igual N: cada ensayo de e usa en promedio 2,72 números aleatorios contra 2
-de π, y tiene un `while` de largo impredecible. En una prueba informal: unos 19 ns por punto de π y
-46 ns por ensayo de e.
+de π, y tiene un `while` de largo impredecible. En una prueba controlada en la notebook: del orden de 20 ns por punto de π y
+45 a 55 ns por ensayo de e (varían con el estado de la máquina; apunte 04, sección 3).
 
 ---
 
@@ -200,7 +200,7 @@ costo fijo: crear los procesos e inicializar MPI cuesta alrededor de 0,3 a 0,4 s
 termina antes de que MPI termine de arrancar.
 
 **Qué decir.** "Con N chico no conviene paralelizar: el costo fijo de arrancar los procesos supera
-al cálculo. El punto de equilibrio está donde el cómputo serial iguala ese costo, que a unos 19 ns
+al cálculo. El punto de equilibrio está donde el cómputo serial iguala ese costo, que a unos 20 ns
 por muestra son del orden de 10⁷ muestras."
 
 **Vocabulario preciso.** Este programa **nunca** queda limitado por la comunicación: hay una sola
@@ -293,7 +293,7 @@ trabajo, ordenadas por conveniencia, está en el apunte 05.
 
 **1. Generador con secuencias independientes garantizadas.** xoshiro256\*\* con su función de salto
 (*jump*): todos los procesos parten de la misma semilla y el proceso r "salta" r × 2¹²⁸ posiciones
-de la secuencia. Los tramos quedan separados por construcción. Además es más rápido que `drand48`.
+de la secuencia. Los tramos quedan separados por construcción. Contra `drand48` es algo más rápido en π (1,1 a 1,2 veces) y casi el doble en e (medido, apunte 04, sección 3).
 Es la mejora que ataca el punto débil declarado del diseño. Está implementado en la rama `main`.
 
 **2. Procesamiento por bloques y vectorización (SIMD).** *En simple:* el procesador puede hacer la
@@ -327,8 +327,8 @@ proporcional a P) además del escalado fuerte.
 
 **Comparación con una librería.** No existe una librería que traiga este problema ya resuelto. La
 referencia natural es NumPy (operaciones vectorizadas). En una medición informal en la notebook con
-N = 10⁸ y un núcleo: NumPy 17 ns por muestra en π y 34 ns en e, contra unos 19 y 46 ns de esta
-versión. Queda parejo en π porque NumPy genera arreglos enteros en memoria y los recorre varias
+N = 10⁸ y un núcleo: NumPy 17 ns por muestra en π y 34 ns en e, contra unos 20 y 45 a 55 ns de esta
+versión (medidas en momentos distintos y la notebook cambia de velocidad: comparación orientativa). Queda parejo en π porque NumPy genera arreglos enteros en memoria y los recorre varias
 veces, mientras que el C trabaja muestra por muestra en los registros del procesador.
 
 ---

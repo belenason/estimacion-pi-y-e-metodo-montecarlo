@@ -311,7 +311,7 @@ valor fijo (0x330E).
 > **¿Es un buen generador?** Es suficiente para este trabajo: el error medido sigue la ley
 > teórica. No es moderno: los generadores congruenciales tienen patrones conocidos en sus bits bajos
 > y no pasan las baterías de pruebas estadísticas más exigentes. La alternativa moderna
-> (xoshiro256\*\*, en la rama `main`) es más rápida y de mejor calidad, a cambio de unas 60 líneas
+> (xoshiro256\*\*, en la rama `main`) es de mejor calidad y algo más rápida (apunte 04, sección 3), a cambio de unas 60 líneas
 > de código con operaciones de bits.
 
 ### 3.5 `calcular_estimacion_pi` y `calcular_estimacion_e`
@@ -899,6 +899,6 @@ sumo una muestra de diferencia, la espera es despreciable.
 `drand48` por `erand48` con un estado por hilo, porque los hilos comparten memoria. MPI permite,
 además, usar varias máquinas.
 
-**¿Cuánto tarda cada muestra?** En una prueba informal en la notebook: unos 19 ns por punto para π y
-unos 46 ns por ensayo para e (cada ensayo genera en promedio 2,72 números). Los valores medidos del
+**¿Cuánto tarda cada muestra?** En una prueba controlada en la notebook: del orden de 20 ns por punto para π y
+45 a 55 ns por ensayo para e (cada ensayo genera en promedio 2,72 números). Los valores medidos del
 benchmark están en `resultados/resumen.csv`.
